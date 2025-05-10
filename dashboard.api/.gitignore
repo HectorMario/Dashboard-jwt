@@ -48,3 +48,6 @@ yarn-error.log*
 # Others
 *.swp
 *.tmp
+
+appsettings.json
+appsettings.Development.json
