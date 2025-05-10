@@ -51,3 +51,7 @@ yarn-error.log*
 
 appsettings.json
 appsettings.Development.json
+
+
+dashboard.db-wal
+dashboard.db-shm
