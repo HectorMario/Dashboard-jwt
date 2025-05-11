@@ -1,4 +1,5 @@
 using Dashboard.Api.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
@@ -21,19 +22,19 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public IActionResult Login([FromBody] Login login)
     {
-        // Validar si el usuario existe
-        User? user = _context.Users.SingleOrDefault(u => u.Email == login.Email);
+        // Validate if the user exists
+        var user = _context.Users.SingleOrDefault(u => u.Email == login.Email);
         if (user == null || !BCrypt.Net.BCrypt.Verify(login.Password, user.Password))
         {
-            return Unauthorized("Credenciales incorrectas.");
+            return Unauthorized(new { message = "Invalid credentials." });
         }
 
-        // Crear el JWT
-        JwtSecurityTokenHandler tokenHandler = new JwtSecurityTokenHandler();
-        byte[] key = Encoding.UTF8.GetBytes(_configuration["Jwt:SecretKey"]);
+        // Create the JWT token
+        var tokenHandler = new JwtSecurityTokenHandler();
+        var key = Encoding.UTF8.GetBytes(_configuration["Jwt:SecretKey"]);
         var tokenDescriptor = new SecurityTokenDescriptor
         {
-            Subject = new ClaimsIdentity(new Claim[]
+            Subject = new ClaimsIdentity(new[]
             {
                 new Claim(ClaimTypes.Name, user.FirstName),
                 new Claim(ClaimTypes.Surname, user.LastName),
@@ -41,7 +42,7 @@ public class AuthController : ControllerBase
                 new Claim(ClaimTypes.Sid, user.Id.ToString()),
                 new Claim(ClaimTypes.Role, user.IsAdmin ? "Admin" : "User")
             }),
-            Expires = DateTime.UtcNow.AddHours(1), // Establecer tiempo de expiración
+            Expires = DateTime.UtcNow.AddHours(1),
             Issuer = _configuration["Jwt:Issuer"],
             Audience = _configuration["Jwt:Audience"],
             SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
@@ -50,6 +51,45 @@ public class AuthController : ControllerBase
         var token = tokenHandler.CreateToken(tokenDescriptor);
         var jwtToken = tokenHandler.WriteToken(token);
 
-        return Ok(new { Token = jwtToken });
+        // Store JWT in an HttpOnly cookie
+        Response.Cookies.Append("jwt", jwtToken, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true, // Set to true in production
+            SameSite = SameSiteMode.Strict,
+            Expires = DateTime.UtcNow.AddHours(5)
+        });
+
+        return Ok(new { message = "Login successful." });
+    }
+
+    [Authorize]
+    [HttpGet("me")]
+    public IActionResult Me()
+    {
+        var userId = User.FindFirst(ClaimTypes.Sid)?.Value;
+
+        if (string.IsNullOrEmpty(userId))
+            return Unauthorized(new { message = "User ID not found in token." });
+
+        var user = _context.Users.Find(int.Parse(userId));
+        if (user == null)
+            return NotFound(new { message = "User not found." });
+
+        return Ok(new
+        {
+            user.Id,
+            user.FirstName,
+            user.LastName,
+            user.Email,
+            user.IsAdmin
+        });
+    }
+
+    [HttpPost("logout")]
+    public IActionResult Logout()
+    {
+        Response.Cookies.Delete("jwt");
+        return Ok(new { message = "Logged out successfully." });
     }
 }
