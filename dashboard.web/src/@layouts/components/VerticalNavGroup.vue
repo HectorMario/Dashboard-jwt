@@ -6,6 +6,11 @@ defineProps<{
 }>()
 
 const isOpen = ref(false)
+
+const isImage = (val: any): boolean => {
+  return typeof val === 'string' && /\.(png|jpe?g|gif|svg)$/.test(val)
+}
+
 </script>
 
 <template>
@@ -17,10 +22,18 @@ const isOpen = ref(false)
       class="nav-group-label"
       @click="isOpen = !isOpen"
     >
-      <VIcon
-        :icon="item.icon || 'ri-checkbox-blank-circle-line'"
+      <VIcon 
+        v-if="!isImage(item.icon)"
+        :icon="typeof item.icon === 'string' ? item.icon : 'ri-checkbox-blank-circle-line'"
         class="nav-item-icon"
       />
+
+      <img
+        v-else
+        :src="item.icon as string"
+        alt="Icon"
+        class="nav-item-icon" />
+
       <span class="nav-item-title">{{ item.title }}</span>
       <span
         class="nav-item-badge"
@@ -40,6 +53,7 @@ const isOpen = ref(false)
     </div>
   </li>
 </template>
+
 
 <style lang="scss">
 .layout-vertical-nav {

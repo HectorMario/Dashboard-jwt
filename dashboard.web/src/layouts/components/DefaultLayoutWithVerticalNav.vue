@@ -40,14 +40,6 @@ import UserProfile from '@/layouts/components/UserProfile.vue'
 
         <VSpacer />
 
-        <IconBtn
-          href="https://github.com/themeselection/materio-vuetify-vuejs-admin-template-free"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <VIcon icon="ri-github-fill" />
-        </IconBtn>
-
         <IconBtn>
           <VIcon icon="ri-notification-line" />
         </IconBtn>
@@ -71,7 +63,7 @@ import UserProfile from '@/layouts/components/UserProfile.vue'
         <!-- eslint-enable -->
 
         <h1 class="font-weight-medium leading-normal text-xl text-uppercase">
-          Materio
+          Per-ez
         </h1>
       </RouterLink>
 

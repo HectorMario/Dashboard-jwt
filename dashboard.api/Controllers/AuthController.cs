@@ -67,12 +67,12 @@ public class AuthController : ControllerBase
     [HttpGet("me")]
     public IActionResult Me()
     {
-        var userId = User.FindFirst(ClaimTypes.Sid)?.Value;
+        string? userId = User.FindFirst(ClaimTypes.Sid)?.Value;
 
         if (string.IsNullOrEmpty(userId))
             return Unauthorized(new { message = "User ID not found in token." });
 
-        var user = _context.Users.Find(int.Parse(userId));
+        User? user = _context.Users.Find(int.Parse(userId));
         if (user == null)
             return NotFound(new { message = "User not found." });
 

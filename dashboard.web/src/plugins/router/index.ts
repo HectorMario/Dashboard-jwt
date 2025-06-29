@@ -3,7 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { routes } from './routes'
 import { fetchCurrentUser } from '@/api/authentication'
 
-const publicPages = ['login', 'register', 'forgot-password']
+const publicPages = ['login', 'forgot-password']
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),

@@ -4,10 +4,10 @@ import { AuthenticatedUser } from '@/types/AuthenticatedUser'
 
 export const login = async (email: string, password: string) => {
   try {
-    api.post('/auth/login', { email, password })
-    const redirectTo = router.currentRoute.value.query.redirect || '/dashboard'
-    console.log(redirectTo)
-    router.push(redirectTo as string)
+    api.post('/auth/login', { email, password }).then(() => {
+      const redirectTo = router.currentRoute.value.query.redirect || '/dashboard'
+      router.push(redirectTo as string)
+    })
   } catch (error) {
     console.error('Error during login:', error)
     throw error
@@ -16,8 +16,8 @@ export const login = async (email: string, password: string) => {
 
 export const logout = async () => {
   try {
-    const response = await api.post('/auth/logout')
-    return response.data
+    await api.post('/auth/logout')
+    router.push({ name: 'login' })
   } catch (error) {
     console.error('Error during logout:', error)
     throw error

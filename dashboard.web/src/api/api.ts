@@ -12,7 +12,7 @@ const api = axios.create({
 // Optional: request interceptor (e.g., to show a loading indicator)
 api.interceptors.request.use(
   config => {
-    // You can add logic here before the request is sent
+   
     return config
   },
   error => {

@@ -45,7 +45,7 @@ const isPasswordVisible = ref(false)
             v-html="logo"
           />
           <h2 class="font-weight-medium text-2xl text-uppercase">
-            Materio
+            Per-ez
           </h2>
         </RouterLink>
       </VCardItem>

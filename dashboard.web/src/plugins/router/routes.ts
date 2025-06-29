@@ -9,6 +9,10 @@ export const routes = [
         component: () => import('@/pages/dashboard.vue'),
       },
       {
+        path: 'tempestive/alfa-report',
+        component: () => import('@/pages/tempestive/AlfaReports.vue'),
+      },
+      {
         path: 'account-settings',
         component: () => import('@/pages/account-settings.vue'),
       },
