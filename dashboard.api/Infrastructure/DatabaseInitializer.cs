@@ -11,10 +11,8 @@ namespace Dashboard.Api.Infrastructure
             var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
 
-            // Asegurar DB y aplicar migraciones
             context.Database.Migrate();
 
-            // Seed de usuario por defecto
             SeedDefaultUser(context, config);
         }
 

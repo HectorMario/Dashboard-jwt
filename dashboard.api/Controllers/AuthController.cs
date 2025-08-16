@@ -93,7 +93,7 @@ public class AuthController : ControllerBase
     [HttpPost("logout")]
     public IActionResult Logout()
     {
-        Response.Cookies.Delete("jwt");
+        Response.Cookies.Delete(_configuration["Jwt:NameToken"] ?? "jwt");
         return Ok(new { message = "Logged out successfully." });
     }
 }
