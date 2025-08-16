@@ -1,8 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
-using System.Text;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Dashboard.Api.Models;
+using Dashboard.Api.Infrastructure;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -22,42 +19,8 @@ builder.Services.AddCors(options =>
     });
 });
 
-// JWT Authentication Setup
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-})
-.AddJwtBearer(options =>
-{
-    options.RequireHttpsMetadata = false;
-    options.SaveToken = true;
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateLifetime = true,
-        ValidIssuer = builder.Configuration["Jwt:Issuer"],
-        ValidAudience = builder.Configuration["Jwt:Audience"],
-        IssuerSigningKey = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(builder.Configuration["Jwt:SecretKey"] ?? throw new Exception("JWT Secret Key is not configured."))
-        )
-    };
-
-    options.Events = new JwtBearerEvents
-    {
-        OnMessageReceived = context =>
-        {
-            var token = context.HttpContext.Request.Cookies["jwt"];
-            if (!string.IsNullOrEmpty(token))
-            {
-                context.Token = token;
-            }
-
-            return Task.CompletedTask;
-        }
-    };
-});
+// JWT Configuration
+builder.Services.AddJwtConfiguration(builder.Configuration);
 
 
 builder.Services.AddEndpointsApiExplorer();
@@ -67,39 +30,9 @@ WebApplication app = builder.Build();
 
 app.UseCors("LocalhostPolicy");
 
-// Default User Setup
-User? userDefault = builder.Configuration.GetSection("UserDefault").Get<User>();
-if (userDefault == null || string.IsNullOrWhiteSpace(userDefault.Email) || string.IsNullOrWhiteSpace(userDefault.Password))
-{
-    throw new Exception("UserDefault configuration is invalid.");
-}
+// Initialize the database and apply migrations
+DatabaseInitializer.Initialize(app);
 
-using (IServiceScope scope = app.Services.CreateScope())
-{
-    AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-
-    // Ensure the admin user exists
-    User? adminUser = context.Users.FirstOrDefault(u => u.Email == userDefault.Email);
-
-    if (adminUser == null)
-    {
-        // Create a default admin user
-        User newAdminUser = new User
-        {
-            FirstName = userDefault.FirstName,
-            LastName = userDefault.LastName,
-            Email = userDefault.Email,
-            Password = BCrypt.Net.BCrypt.HashPassword(userDefault.Password),
-            IsAdmin = true,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        };
-
-        context.Users.Add(newAdminUser);
-        context.SaveChanges();
-    }
-}
 
 // Configure HTTP request pipeline
 if (app.Environment.IsDevelopment())

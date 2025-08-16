@@ -29,9 +29,24 @@ public class AuthController : ControllerBase
             return Unauthorized(new { message = "Invalid credentials." });
         }
 
-        // Create the JWT token
+        var jwtToken = GenerateToken(user);
+
+        // Store JWT in an HttpOnly cookie
+        Response.Cookies.Append( _configuration["Jwt:NameToken"] ?? "jwt" , jwtToken, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true, // Set to true in production
+            SameSite = SameSiteMode.Strict,
+            Expires = DateTime.UtcNow.AddHours(5)
+        });
+
+        return Ok(new { message = "Login successful." });
+    }
+
+    private string GenerateToken(User user)
+    {
         var tokenHandler = new JwtSecurityTokenHandler();
-        var key = Encoding.UTF8.GetBytes(_configuration["Jwt:SecretKey"]);
+        var key = Encoding.UTF8.GetBytes(_configuration["Jwt:SecretKey"] ?? throw new Exception("JWT Secret Key is not configured."));
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(new[]
@@ -49,18 +64,7 @@ public class AuthController : ControllerBase
         };
 
         var token = tokenHandler.CreateToken(tokenDescriptor);
-        var jwtToken = tokenHandler.WriteToken(token);
-
-        // Store JWT in an HttpOnly cookie
-        Response.Cookies.Append("jwt", jwtToken, new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = true, // Set to true in production
-            SameSite = SameSiteMode.Strict,
-            Expires = DateTime.UtcNow.AddHours(5)
-        });
-
-        return Ok(new { message = "Login successful." });
+        return tokenHandler.WriteToken(token);
     }
 
     [Authorize]
