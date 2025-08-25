@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Dashboard.Api.Infrastructure;
+using Microsoft.OpenApi.Models;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -22,6 +23,17 @@ builder.Services.AddCors(options =>
 // JWT Configuration
 builder.Services.AddJwtConfiguration(builder.Configuration);
 
+// Tempestive Service
+builder.Services.AddScoped<Dashboard.Api.Services.TempestiveService>();
+
+// Swagger Configuration
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Dashboard API", Version = "v1" });
+
+    // Esto permite manejar bien IFormFile
+    c.OperationFilter<FileUploadOperationFilter>();
+});
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
