@@ -1,4 +1,5 @@
 {
+  "editor.tabSize": 2,
   "editor.formatOnSave": true,
   "files.insertFinalNewline": true,
   "javascript.updateImportsOnFileMove.enabled": "always",
@@ -104,6 +105,6 @@
         "borderColor": "green",
         "borderStyle": "solid"
       }
-    ]
+    ],
   }
 }

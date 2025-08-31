@@ -1,6 +1,6 @@
 <script setup lang="ts">
-    import { ref } from "vue"
     import { salvaAlfaReport } from "@/api/tempestive"
+import { ref } from "vue"
 
     const dialog = ref(false)
     const mese = ref(null)
@@ -40,34 +40,31 @@
 
       salvaAlfaReport(formData)
       .then((response) => {
-        // Crea un URL temporaneo dal blob
-       const blob = new Blob([response.data], { type: response.headers["content-type"] })
-        const url = window.URL.createObjectURL(blob)
+        // response.data ya es un Blob
+        const blob = response;
 
-        let fileName = "report.xlsx"
-        const cd = response.headers["content-disposition"]
-        if (cd) {
-          const match = cd.match(/filename="?([^"]+)"?/)
-          if (match?.[1]) fileName = match[1]
-        }
+        const url = window.URL.createObjectURL(blob);
 
-        const link = document.createElement("a")
-        link.href = url
-        link.setAttribute("download", fileName)
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        window.URL.revokeObjectURL(url)
+        let fileName = "report.xlsx";
 
-        // Reset campi
-        mese.value = null
-        anno.value = null
-        file.value = null
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute("download", fileName);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+        // Reset campos
+        mese.value = null;
+        anno.value = null;
+        file.value = null;
       })
       .catch((error) => {
-        console.error("Errore durante il salvataggio del report:", error)
-        alert("Si è verificato un errore durante il salvataggio del report.")
-      })
+        console.error("Errore durante il salvataggio del report:", error);
+        alert("Si è verificato un errore durante il salvataggio del report.");
+      }
+      );
 
       dialog.value = false
     }
