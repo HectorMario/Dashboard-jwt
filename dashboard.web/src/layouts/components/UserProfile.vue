@@ -49,7 +49,7 @@ import { logout } from '@/api/authentication';
             </template>
 
             <VListItemTitle class="font-weight-semibold">
-              John Doe
+              John Dow
             </VListItemTitle>
             <VListItemSubtitle>Admin</VListItemSubtitle>
           </VListItem>

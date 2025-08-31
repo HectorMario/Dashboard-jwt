@@ -11,3 +11,18 @@ export const alfaReports = async () => {
     throw error
   }
 }
+
+export const salvaAlfaReport = async (reportData: any) => {
+  try {
+    const response = await api.post('/tempestive/alfasreports', reportData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      responseType: "blob"
+    })
+    return response.data
+  } catch (error) {
+    console.error('Error saving Alfa report:', error)
+    throw error
+  }
+}
