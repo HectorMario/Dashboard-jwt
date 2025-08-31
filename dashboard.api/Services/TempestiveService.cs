@@ -1,120 +1,199 @@
 using System.Globalization;
+using Dashboard.Api.Models;
+using Microsoft.AspNetCore.Mvc;
 using OfficeOpenXml;
 
 namespace Dashboard.Api.Services
 {
-    public class TempestiveService
+    public interface ITempestiveService
     {
-        public Stream ProcessExcel(Stream fileStream, int month, int year)
+        IActionResult GenerateAlfaReport(Stream fileStream, int month, int year, User user);
+    }
+
+    public class TempestiveService : ITempestiveService
+    {
+        private const string TemplateFileName = "rapportino_alfa.xlsx";
+        private const int StartRow = 8;
+        private const int DateColumn = 1;
+        private const int NoteColumn = 2;
+        private const int HoursColumn = 3;
+        private const int RemoteWorkColumn = 4;
+
+        public IActionResult GenerateAlfaReport(Stream fileStream, int month, int year, User user)
         {
-            // Set license context for EPPlus
             ExcelPackage.License.SetNonCommercialOrganization("Per-ez Software");
 
+            var filteredRows = ExtractAndFilterData(fileStream, month, year);
+            var reportStream = CreateAlfaReport(filteredRows, month, year, user);
+            var fileName = GenerateFileName(month, year);
+
+            return CreateFileResult(reportStream, fileName);
+        }
+
+        private List<(DateTime Date, List<object> Values)> ExtractAndFilterData(Stream fileStream, int month, int year)
+        {
             using var package = new ExcelPackage(fileStream);
-            var ws = package.Workbook.Worksheets[0];
-
-            var rows = new List<(DateTime Data, List<object> Values)>();
-
-            int rowCount = ws.Dimension.Rows;
+            var worksheet = package.Workbook.Worksheets[0];
+            
+            var rows = new List<(DateTime Date, List<object> Values)>();
+            var rowCount = worksheet.Dimension?.End.Row ?? 0;
 
             for (int row = 1; row <= rowCount; row++)
             {
-                var dateCell = ws.Cells[row, 1].Text;
-                if (DateTime.TryParse(dateCell, new CultureInfo("it-IT"), DateTimeStyles.None, out DateTime data))
+                var dateCell = worksheet.Cells[row, DateColumn].Text;
+                if (TryParseDate(dateCell, out DateTime date) && IsTargetMonthYear(date, month, year))
                 {
-                    var values = new List<object>();
-                    for (int col = 1; col <= ws.Dimension.Columns; col++)
-                    {
-                        if (col == 1) continue; // Skip columb A (data)
-
-                        values.Add(ws.Cells[row, col].Text);
-                    }
-
-                    // Format the date in only day/month/year
-                    data = new DateTime(data.Year, data.Month, data.Day);
-
-                    // Check if the date matches the specified month and year
-                    if (data.Month == month && data.Year == year)
-                        rows.Add((data, values));
+                    var values = ExtractRowValues(worksheet, row);
+                    rows.Add((date.Date, values));
                 }
             }
 
-            rows = rows.OrderBy(r => r.Data).ToList();
-
-            package.Dispose();
-
-            // Create the new Excel using the template
-            return CreateAlfaReport(rows, month, year);
+            return rows.OrderBy(r => r.Date).ToList();
         }
 
-        private Stream CreateAlfaReport(List<(DateTime Data, List<object> Values)> rows, int month, int year)
+        private bool TryParseDate(string dateString, out DateTime date)
         {
+            return DateTime.TryParse(dateString, new CultureInfo("it-IT"), DateTimeStyles.None, out date);
+        }
 
-            if (rows == null || rows.Count == 0)
-                throw new ArgumentException("Nessun dato da elaborare per il report.");
+        private bool IsTargetMonthYear(DateTime date, int month, int year)
+        {
+            return date.Month == month && date.Year == year;
+        }
 
-            // Path to the template Excel file
-            var projectRoot = Directory.GetCurrentDirectory();
-            var templatePath = Path.Combine(projectRoot, "Templates", "rapportino_alfa.xlsx");
+        private List<object> ExtractRowValues(ExcelWorksheet worksheet, int row)
+        {
+            var values = new List<object>();
+            var columnCount = worksheet.Dimension?.Columns ?? 0;
 
-            if (!File.Exists(templatePath))
-                throw new FileNotFoundException("Template Excel non trovato", templatePath);
-
-            // Open the template Excel file
-            using var templateStream = new FileStream(templatePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-            using var package = new ExcelPackage(templateStream);
-
-            var ws = package.Workbook.Worksheets[0];
-
-            // Set the month and year in cell B4
-            ws.Cells["B4"].Value = new DateTime(year, month, 1).ToString("MM/yyyy");
-
-            // Set the employee name in cell B5
-            ws.Cells["B5"].Value = "Nome Dipendente";
-
-            // Set the last day of the month in cell B45
-            var lastDay = new DateTime(year, month, DateTime.DaysInMonth(year, month));
-            ws.Cells["B45"].Value = lastDay.ToString("dd/MM/yyyy");
-
-            for (int i = 0; i < rows.Count; i++)
+            for (int col = 1; col <= columnCount; col++)
             {
-                createRow(ws, i + 8, rows[i]); // Start inserting from row 8
+                if (col != DateColumn) // Skip date column
+                {
+                    values.Add(worksheet.Cells[row, col].Text);
+                }
             }
 
-            // Auto-fit columns for better presentation
-            ws.Cells.AutoFitColumns();
-
-            // Save the modified Excel to a MemoryStream
-            var outputStream = new MemoryStream();
-            package.SaveAs(outputStream);
-            outputStream.Position = 0;
-
-            return outputStream;
+            return values;
         }
-        
-        private void createRow(ExcelWorksheet ws, int excelRow, (DateTime Data, List<object> Values) rowData)
+
+        private Stream CreateAlfaReport(List<(DateTime Date, List<object> Values)> rows, int month, int year, User user)
         {
-            ws.Cells[excelRow, 1].Value = rowData.Data; // Column A: Date
+            ValidateRows(rows);
+            
+            var templatePath = GetTemplatePath();
+            using var templateStream = new FileStream(templatePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var package = new ExcelPackage(templateStream);
+            
+            var worksheet = package.Workbook.Worksheets[0];
+            
+            PopulateHeaderData(worksheet, month, year, user);
+            PopulateRowsData(worksheet, rows);
+            
+            worksheet.Cells.AutoFitColumns();
+
+            return SaveToMemoryStream(package);
+        }
+
+        private void ValidateRows(List<(DateTime Date, List<object> Values)> rows)
+        {
+            if (rows == null || rows.Count == 0)
+            {
+                throw new ArgumentException("Nessun dato da elaborare per il report.");
+            }
+        }
+
+        private string GetTemplatePath()
+        {
+            var projectRoot = Directory.GetCurrentDirectory();
+            var templatePath = Path.Combine(projectRoot, "Templates", TemplateFileName);
+
+            if (!File.Exists(templatePath))
+            {
+                throw new FileNotFoundException("Template Excel non trovato", templatePath);
+            }
+
+            return templatePath;
+        }
+
+        private void PopulateHeaderData(ExcelWorksheet worksheet, int month, int year, User user)
+        {
+            // Set month and year
+            worksheet.Cells["B4"].Value = new DateTime(year, month, 1);
+            
+            // Set employee name
+            worksheet.Cells["B5"].Value = $"{user.FirstName} {user.LastName}";
+            
+            // Set last day of month
+            var lastDay = new DateTime(year, month, DateTime.DaysInMonth(year, month));
+            worksheet.Cells["B45"].Value = lastDay.ToString("dd/MM/yyyy");
+        }
+
+        private void PopulateRowsData(ExcelWorksheet worksheet, List<(DateTime Date, List<object> Values)> rows)
+        {
+            for (int i = 0; i < rows.Count; i++)
+            {
+                PopulateRow(worksheet, StartRow + i, rows[i]);
+            }
+        }
+
+        private void PopulateRow(ExcelWorksheet worksheet, int excelRow, (DateTime Date, List<object> Values) rowData)
+        {
+            worksheet.Cells[excelRow, DateColumn].Value = rowData.Date;
 
             for (int col = 0; col < rowData.Values.Count; col++)
             {
-                switch (col)
-                {
-                    case 6:
-                        ws.Cells[excelRow, 2].Value = rowData.Values[col]; // Column B: Value
-                        break;
-                    case 3:
-                        ws.Cells[excelRow, 3].Value = rowData.Values[col]; // Column C: Value
-                        break;
-
-                    case 5 :
-                        if (!string.Equals(rowData.Values[col]?.ToString(), "ufficio", StringComparison.OrdinalIgnoreCase)) ws.Cells[excelRow, 4].Value = 1;
-                        break;
-                    default:
-                        
-                        break;
-                }
+                ProcessColumnValue(worksheet, excelRow, col, rowData.Values[col]);
             }
+        }
+
+        private void ProcessColumnValue(ExcelWorksheet worksheet, int row, int columnIndex, object value)
+        {
+            switch (columnIndex)
+            {
+                case 6:
+                    worksheet.Cells[row, NoteColumn].Value = value;
+                    break;
+                case 3:
+                    worksheet.Cells[row, HoursColumn].Value = ParseHours(value);
+                    break;
+                case 5:
+                    worksheet.Cells[row, RemoteWorkColumn].Value = IsRemoteWork(value) ? 1 : null;
+                    break;
+            }
+        }
+
+        private int ParseHours(object value)
+        {
+            return int.TryParse(value?.ToString(), out int hours) ? hours : 0;
+        }
+
+        private bool IsRemoteWork(object value)
+        {
+            return !string.Equals(value?.ToString(), "ufficio", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private MemoryStream SaveToMemoryStream(ExcelPackage package)
+        {
+            var memoryStream = new MemoryStream();
+            package.SaveAs(memoryStream);
+            memoryStream.Position = 0;
+            return memoryStream;
+        }
+
+        private string GenerateFileName(int month, int year)
+        {
+            return $"rapportino_{month}_{year}.xlsx";
+        }
+
+        private FileContentResult CreateFileResult(Stream stream, string fileName)
+        {
+            var fileContent = ((MemoryStream)stream).ToArray();
+            
+            return new FileContentResult(fileContent, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            {
+                FileDownloadName = fileName
+            };
         }
     }
 }
